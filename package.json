@@ -1,0 +1,11 @@
+{
+  "name": "pay-me-app",
+  "version": "1.0.0",
+  "description": "Simple payment page using Stripe",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "stripe": "^14.0.0"
+  }
+}

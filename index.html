@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Payment</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Font: Outfit (modern, clean) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Stripe.js -->
+    <script src="https://js.stripe.com/v3/"></script>
+    
+    <style>
+        * {
+            font-family: 'Outfit', sans-serif;
+        }
+        
+        /* Animated gradient background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 8s ease infinite;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* Glowing border effect on focus */
+        .input-glow:focus {
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3), 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+        
+        /* Button hover animation */
+        .btn-pay {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-pay:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
+        }
+        
+        .btn-pay:active {
+            transform: translateY(0);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Subtle floating animation for the card */
+        .card-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        /* Dollar sign styling */
+        .dollar-sign {
+            color: #6366f1;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    
+    <!-- Main Card -->
+    <div class="card-float bg-white/10 backdrop-blur-xl rounded-3xl p-8 md:p-12 w-full max-w-md border border-white/20 shadow-2xl">
+        
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 mb-6 shadow-lg">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">Send Payment</h1>
+            <p class="text-gray-400 text-sm">Enter the amount you'd like to send</p>
+        </div>
+        
+        <!-- Amount Input -->
+        <div class="mb-8">
+            <label class="block text-gray-400 text-sm font-medium mb-3">Amount (USD)</label>
+            <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-semibold dollar-sign">$</span>
+                <input 
+                    type="number" 
+                    id="amount" 
+                    min="1" 
+                    step="0.01"
+                    placeholder="0.00"
+                    class="input-glow w-full bg-white/5 border border-white/20 rounded-2xl py-5 pl-12 pr-4 text-3xl font-semibold text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-all"
+                >
+            </div>
+            <p id="error-message" class="text-red-400 text-sm mt-2 hidden">Please enter a valid amount</p>
+        </div>
+        
+        <!-- Pay Button -->
+        <button 
+            id="pay-button"
+            onclick="handlePayment()"
+            class="btn-pay w-full py-5 rounded-2xl text-white font-semibold text-lg flex items-center justify-center gap-2"
+        >
+            <span id="btn-text">Send Payment</span>
+            <div id="btn-spinner" class="spinner hidden"></div>
+            <svg id="btn-arrow" class="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            </svg>
+        </button>
+        
+        <!-- Security Note -->
+        <div class="mt-8 flex items-center justify-center gap-2 text-gray-500 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+            <span>Secured by Stripe</span>
+        </div>
+    </div>
+    
+    <script>
+        // =====================================================
+        // IMPORTANT: Replace this with your Stripe publishable key
+        // You'll get this from your Stripe dashboard
+        // =====================================================
+        const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SdTegRk9irTima3p7yqw8hDjISUumKSCv9eFvTjgcQNSFUPbemvGvJuojS6H9zRAJ0mojkDPsjDyLDAVsgmUMfD00qB2V7ypj';
+        
+        // Initialize Stripe
+        const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+        
+        // Handle the payment button click
+        async function handlePayment() {
+            const amountInput = document.getElementById('amount');
+            const errorMessage = document.getElementById('error-message');
+            const btnText = document.getElementById('btn-text');
+            const btnSpinner = document.getElementById('btn-spinner');
+            const btnArrow = document.getElementById('btn-arrow');
+            const payButton = document.getElementById('pay-button');
+            
+            // Get the amount and validate it
+            const amount = parseFloat(amountInput.value);
+            
+            if (!amount || amount < 1) {
+                errorMessage.textContent = 'Please enter an amount of at least $1.00';
+                errorMessage.classList.remove('hidden');
+                amountInput.classList.add('border-red-500');
+                return;
+            }
+            
+            // Hide any previous errors
+            errorMessage.classList.add('hidden');
+            amountInput.classList.remove('border-red-500');
+            
+            // Show loading state
+            btnText.textContent = 'Processing...';
+            btnSpinner.classList.remove('hidden');
+            btnArrow.classList.add('hidden');
+            payButton.disabled = true;
+            payButton.classList.add('opacity-75', 'cursor-not-allowed');
+            
+            try {
+                // Call our backend to create a Stripe Checkout session
+                const response = await fetch('/api/create-checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        amount: Math.round(amount * 100), // Convert to cents
+                    }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Redirect to Stripe Checkout
+                const result = await stripe.redirectToCheckout({
+                    sessionId: data.sessionId,
+                });
+                
+                if (result.error) {
+                    throw new Error(result.error.message);
+                }
+                
+            } catch (error) {
+                // Show error message
+                errorMessage.textContent = error.message || 'Something went wrong. Please try again.';
+                errorMessage.classList.remove('hidden');
+                
+                // Reset button state
+                btnText.textContent = 'Send Payment';
+                btnSpinner.classList.add('hidden');
+                btnArrow.classList.remove('hidden');
+                payButton.disabled = false;
+                payButton.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }
+        
+        // Allow pressing Enter to submit
+        document.getElementById('amount').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handlePayment();
+            }
+        });
+        
+        // Clear error when user starts typing
+        document.getElementById('amount').addEventListener('input', function() {
+            document.getElementById('error-message').classList.add('hidden');
+            this.classList.remove('border-red-500');
+        });
+    </script>
+</body>
+</html>
